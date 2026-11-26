@@ -6,10 +6,20 @@
 
 A tiny companion for a make.fun X promotion entry: it prints the address of the quote post that promotes make.fun's make-your-own-bounty bounty.
 
+## The post
+
+The entry is the quote post from @fantasyshz: https://x.com/fantasyshz/status/2125755314154926396
+
 ## Run it
 
 ```sh
 node main.ts
+```
+
+## Usage
+
+```sh
+node main.ts --json
 ```
 
 ---

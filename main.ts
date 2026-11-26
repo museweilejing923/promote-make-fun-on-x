@@ -9,30 +9,51 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const POST_FILE = "POST.json";
+const STATUS_URL = /^https:\/\/x\.com\/[A-Za-z0-9_]+\/status\/\d+$/;
 
 function postFilePath(): string {
   return join(dirname(fileURLToPath(import.meta.url)), POST_FILE);
 }
 
-function readPostUrl(path: string): string | null {
-  if (!existsSync(path)) return null;
+type PostResult = { ok: true; url: string } | { ok: false; reason: "missing" | "unreadable" | "invalid-url" };
+
+function isValidPostUrl(url: unknown): url is string {
+  return typeof url === "string" && STATUS_URL.test(url);
+}
+
+function readPost(path: string): PostResult {
+  if (!existsSync(path)) return { ok: false, reason: "missing" };
   try {
     const data = JSON.parse(readFileSync(path, "utf8")) as unknown;
     const url = (data as { url?: unknown } | null)?.url;
-    return typeof url === "string" && url.length > 0 ? url : null;
+    return isValidPostUrl(url)
+      ? { ok: true, url }
+      : { ok: false, reason: "invalid-url" };
   } catch {
-    return null;
+    return { ok: false, reason: "unreadable" };
+  }
+}
+
+const REASON_TEXT: Record<PostResult["reason"], string> = {
+  missing: `No post URL yet: ${POST_FILE} is missing.`,
+  unreadable: `Cannot read ${POST_FILE}: it is not valid JSON.`,
+  "invalid-url": `Bad URL in ${POST_FILE}: expected an x.com status link.`,
+};
+
+function report(result: PostResult, asJson: boolean): void {
+  if (asJson) {
+    console.log(JSON.stringify(result.ok ? { url: result.url } : { error: result.reason }));
+    return;
+  }
+  if (result.ok) {
+    console.log(`Submitted post: ${result.url}`);
+  } else {
+    console.log(REASON_TEXT[result.reason]);
   }
 }
 
 function main(): void {
-  const url = readPostUrl(postFilePath());
-  if (url === null) {
-    console.log(`No post URL yet: ${POST_FILE} is missing or has no url field.`);
-    console.log("Post on X first, then add POST.json with the post URL.");
-    return;
-  }
-  console.log(`Submitted post: ${url}`);
+  report(readPost(postFilePath()), process.argv.slice(2).includes("--json"));
 }
 
 main();
